@@ -1,5 +1,5 @@
-// Ruta relativa nativa para Vercel Serverless
-const API_URL = "/api/vision";
+// Cambiar ruta relativa por el dominio absoluto de Vercel
+const API_URL = "https://1-3-app-web-para-identificaci-n-de-sigma.vercel.app/api/vision";
 
 // Referencias del DOM
 const form = document.getElementById("chatForm");
