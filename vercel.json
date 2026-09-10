@@ -1,8 +1,4 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/vision",
-      "destination": "/api/vision.py"
-    }
-  ]
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": null
 }

@@ -2,6 +2,7 @@ import json
 import os
 import base64
 import io
+import urllib.request
 from http.server import BaseHTTPRequestHandler
 from openai import OpenAI
 from PIL import Image, ImageDraw
@@ -39,21 +40,31 @@ class handler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode("utf-8"))
 
-            b64_image = data.get("image")
+            image_payload = data.get("image")
             prompt_text = data.get("prompt")
 
-            if not b64_image or not prompt_text:
-                self.send_json(400, {"error": "Se requiere 'image' en base64 y 'prompt'."})
+            if not image_payload or not prompt_text:
+                self.send_json(400, {"error": "Se requiere 'image' (Base64 o URL) y 'prompt'."})
                 return
 
-            if "," in b64_image:
-                _, b64_data = b64_image.split(",", 1)
-            else:
-                b64_data = b64_image
-
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            is_url = image_payload.startswith("http://") or image_payload.startswith("https://")
 
-            # Restricción estricta de formato JSON para coordenadas
+            # Manejo bifurcado para URLs externas y strings Base64
+            if is_url:
+                openai_image_url = image_payload
+                req = urllib.request.Request(image_payload, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req) as response:
+                    image_bytes = response.read()
+            else:
+                if "," in image_payload:
+                    _, b64_data = image_payload.split(",", 1)
+                else:
+                    b64_data = image_payload
+                
+                openai_image_url = f"data:image/jpeg;base64,{b64_data}"
+                image_bytes = base64.b64decode(b64_data)
+
             sys_prompt = (
                 "Actúa como un modelo de detección de objetos. "
                 "Devuelve ÚNICAMENTE un array JSON válido con las coordenadas 'x' e 'y' normalizadas (de 0.0 a 1.0) "
@@ -61,7 +72,6 @@ class handler(BaseHTTPRequestHandler):
                 "Si no hay elementos, devuelve []. No incluyas markdown ni explicaciones."
             )
 
-            # Uso de gpt-4o para mejor razonamiento espacial
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -70,7 +80,7 @@ class handler(BaseHTTPRequestHandler):
                         "role": "user",
                         "content": [
                             {"type": "text", "text": f"Encuentra: {prompt_text}"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_data}"}}
+                            {"type": "image_url", "image_url": {"url": openai_image_url}}
                         ]
                     }
                 ],
@@ -80,7 +90,7 @@ class handler(BaseHTTPRequestHandler):
 
             response_text = response.choices[0].message.content.strip()
             
-            # Limpieza de sintaxis Markdown residual
+            # Sanitización de bloque de código Markdown si el modelo lo agrega
             if response_text.startswith("```json"):
                 response_text = response_text[7:-3].strip()
             elif response_text.startswith("```"):
@@ -89,13 +99,10 @@ class handler(BaseHTTPRequestHandler):
             coords = json.loads(response_text)
             count = len(coords)
 
-            # Modificación de la imagen en memoria
-            image_bytes = base64.b64decode(b64_data)
+            # Dibujo de elipses con Pillow
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             draw = ImageDraw.Draw(img)
             width, height = img.size
-            
-            # Radio dinámico basado en la resolución (2%)
             radius = max(width, height) * 0.02 
 
             for point in coords:
