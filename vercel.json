@@ -1,4 +1,8 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "framework": null
+  "rewrites": [
+    {
+      "source": "/api/vision",
+      "destination": "/api/vision.py"
+    }
+  ]
 }
