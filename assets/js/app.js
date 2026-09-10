@@ -1,5 +1,5 @@
 // Ruta del nuevo endpoint de visión
-const API_URL = "1-3-app-web-para-identificaci-n-de-sigma.vercel.app/api/vision";
+const API_URL = "https://1-3-app-web-para-identificaci-n-de-sigma.vercel.app/api/vision";
 
 // Referencias del DOM
 const form = document.getElementById("chatForm");
