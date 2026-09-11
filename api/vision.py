@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import base64
 import io
@@ -64,19 +64,19 @@ class handler(BaseHTTPRequestHandler):
                 openai_image_url = f"data:image/jpeg;base64,{b64_data}"
                 image_bytes = base64.b64decode(b64_data)
 
-            # PROMPT ESTRICTO PARA MÁXIMA PRECISIÓN
+            # Modificación: Obliga la estructura a {"puntos": [{"x": ..., "y": ...}]}
             sys_prompt = (
                 "Eres un modelo experto en visión computacional de alta precisión. "
                 "Tu tarea es analizar la imagen y ubicar el CENTRO EXACTO de cada elemento solicitado. "
-                "Devuelve ÚNICAMENTE un array JSON válido con las coordenadas 'x' e 'y' normalizadas (de 0.000 a 1.000). "
-                "Ejemplo estricto: [{\"x\": 0.512, \"y\": 0.498}]. "
-                "Si un elemento está ocluido o no es claro, omítelo. Si no hay elementos, devuelve []. "
-                "NO devuelvas texto, markdown, ni explicaciones adicionales."
+                "Devuelve ÚNICAMENTE un objeto JSON con la clave 'puntos' que contenga un array de coordenadas 'x' e 'y' normalizadas (0.000 a 1.000). "
+                "Ejemplo estricto: {\"puntos\": [{\"x\": 0.512, \"y\": 0.498}]}. "
+                "Si un elemento está ocluido o no es claro, omítelo. Si no hay elementos, devuelve {\"puntos\": []}."
             )
 
-            # ANÁLISIS EN ALTA RESOLUCIÓN (detail: "high")
+            # Integración de response_format={"type": "json_object"}
             response = client.chat.completions.create(
                 model="gpt-4o",
+                response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": sys_prompt},
                     {
@@ -93,30 +93,24 @@ class handler(BaseHTTPRequestHandler):
 
             response_text = response.choices[0].message.content.strip()
             
-            if response_text.startswith("```json"):
-                response_text = response_text[7:-3].strip()
-            elif response_text.startswith("```"):
-                response_text = response_text[3:-3].strip()
-
-            coords = json.loads(response_text)
+            # Parseo directo sin comprobaciones de Markdown
+            parsed_json = json.loads(response_text)
+            coords = parsed_json.get("puntos", [])
             count = len(coords)
 
             img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             draw = ImageDraw.Draw(img)
             width, height = img.size
-            radius = max(width, height) * 0.015  # Reducido al 1.5% para marcar mejor el centro
+            radius = max(width, height) * 0.015 
 
-            # RENDERIZADO VISUAL MEJORADO (Círculo exterior + Punto central)
             for point in coords:
                 cx = point.get("x", 0) * width
                 cy = point.get("y", 0) * height
                 
-                # Aro exterior (rojo vibrante)
                 draw.ellipse(
                     [(cx - radius, cy - radius), (cx + radius, cy + radius)],
                     outline="#ff0000", width=max(2, int(radius * 0.3))
                 )
-                # Punto central (relleno)
                 dot_r = radius * 0.3
                 draw.ellipse(
                     [(cx - dot_r, cy - dot_r), (cx + dot_r, cy + dot_r)],
@@ -132,7 +126,7 @@ class handler(BaseHTTPRequestHandler):
                 "image": f"data:image/jpeg;base64,{out_b64}"
             })
 
-        except json.JSONDecodeError:
-            self.send_json(500, {"error": "Fallo en la estructura del modelo. No se detectaron coordenadas válidas."})
+        except json.JSONDecodeError as e:
+            self.send_json(500, {"error": f"Fallo estructural del modelo. Payload: {response_text}"})
         except Exception as e:
             self.send_json(500, {"error": str(e)})
