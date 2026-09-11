@@ -51,10 +51,10 @@ class handler(BaseHTTPRequestHandler):
             is_url = image_payload.startswith("http://") or image_payload.startswith("https://")
 
             if is_url:
-                openai_image_url = image_payload
                 req = urllib.request.Request(image_payload, headers={'User-Agent': 'Mozilla/5.0'})
                 with urllib.request.urlopen(req) as response:
                     image_bytes = response.read()
+                openai_image_url = image_payload
             else:
                 if "," in image_payload:
                     _, b64_data = image_payload.split(",", 1)
@@ -64,16 +64,17 @@ class handler(BaseHTTPRequestHandler):
                 openai_image_url = f"data:image/jpeg;base64,{b64_data}"
                 image_bytes = base64.b64decode(b64_data)
 
-            # Modificación: Obliga la estructura a {"puntos": [{"x": ..., "y": ...}]}
+            # PROMPT CORREGIDO: Más permisivo, enfocado en identificar todo sin importar oclusión
             sys_prompt = (
-                "Eres un modelo experto en visión computacional de alta precisión. "
-                "Tu tarea es analizar la imagen y ubicar el CENTRO EXACTO de cada elemento solicitado. "
-                "Devuelve ÚNICAMENTE un objeto JSON con la clave 'puntos' que contenga un array de coordenadas 'x' e 'y' normalizadas (0.000 a 1.000). "
-                "Ejemplo estricto: {\"puntos\": [{\"x\": 0.512, \"y\": 0.498}]}. "
-                "Si un elemento está ocluido o no es claro, omítelo. Si no hay elementos, devuelve {\"puntos\": []}."
+                "Eres un experto en detección de objetos. "
+                "Encuentra TODOS los elementos que el usuario indique, incluso si están agrupados, de espaldas o parcialmente ocultos. "
+                "Responde ÚNICAMENTE con un objeto JSON que contenga un arreglo llamado 'puntos'. "
+                "Cada punto es el centro del objeto detectado con coordenadas 'x' e 'y' normalizadas (0.000 a 1.000). "
+                "Ejemplo: {\"puntos\": [{\"x\": 0.450, \"y\": 0.600}, {\"x\": 0.820, \"y\": 0.310}]}. "
+                "Incluso si el usuario pide 'contar', tú debes devolver la lista de coordenadas de cada uno."
             )
 
-            # Integración de response_format={"type": "json_object"}
+            # TEXTO DE USUARIO CORREGIDO: Instrucción directa
             response = client.chat.completions.create(
                 model="gpt-4o",
                 response_format={"type": "json_object"},
@@ -82,7 +83,7 @@ class handler(BaseHTTPRequestHandler):
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": f"Mapea con precisión absoluta: {prompt_text}"},
+                            {"type": "text", "text": f"Busca y mapea: {prompt_text}"},
                             {"type": "image_url", "image_url": {"url": openai_image_url, "detail": "high"}}
                         ]
                     }
@@ -92,8 +93,6 @@ class handler(BaseHTTPRequestHandler):
             )
 
             response_text = response.choices[0].message.content.strip()
-            
-            # Parseo directo sin comprobaciones de Markdown
             parsed_json = json.loads(response_text)
             coords = parsed_json.get("puntos", [])
             count = len(coords)
