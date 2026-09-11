@@ -27,8 +27,10 @@
 .header-gradient {
     background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-blue) 100%);
     position: relative;
-    overflow: hidden; /* Nota: Remueve esto si tienes modales/dropdowns que se cortan */
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden; /* Aquí sí es seguro usarlo porque Bootstrap maneja el layout interno */
 }
+
 .header-gradient::after {
     content: "";
     position: absolute;
@@ -37,11 +39,21 @@
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
     animation: headerShine 8s ease-in-out infinite;
     pointer-events: none;
+    z-index: 1;
 }
+
+/* Eleva el contenedor de Bootstrap por encima de la animación de brillo */
+.header-gradient > .container-md {
+    position: relative;
+    z-index: 2;
+}
+
 @keyframes headerShine {
     0%, 100% { left: -30%; }
     50%      { left: 130%; }
 }
+
+/* Ícono e interactividad de la marca */
 .brand-icon {
     display: flex; align-items: center; justify-content: center;
     width: 42px; height: 42px;
@@ -54,11 +66,14 @@
     transform: rotate(-6deg) scale(1.05);
     background: rgba(255,255,255,0.15);
 }
+
+/* Badges y botones */
 .status-badge {
     background: rgba(34, 197, 94, 0.15) !important;
     color: #bbf7d0 !important;
     border: 1px solid rgba(34, 197, 94, 0.4);
     backdrop-filter: blur(4px);
+    font-weight: 600;
 }
 .pulse-dot {
     color: var(--success);
@@ -74,7 +89,6 @@
     background-color: rgba(255,255,255,0.12) !important;
     transform: translateY(-1px);
 }
-
 /* --- ÁREA DE CHAT --- */
 .bg-chat {
     background-color: var(--bg-soft) !important;
