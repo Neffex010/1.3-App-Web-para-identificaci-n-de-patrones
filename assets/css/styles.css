@@ -712,106 +712,27 @@
 }
 
 /* =========================================================
-   FIX v5 — scroll restaurado + header estable
+   FIX minimo — header estable + imagen contenida
+   Sin tocar overflow de html/body/main
    ========================================================= */
 
-/* 1. NO tocar overflow de html/body. Bootstrap ya gestiona
-      el layout tipo app con "vh-100 overflow-hidden".
-      Solo aseguramos que no se estire a lo ancho. */
-body {
-    max-width: 100vw;
-}
-
-/* 2. Contenedores principales: respetan viewport y no se estiran */
+/* Evita que el header/main/footer se estiren si el contenido
+   interno intenta ser mas ancho que el viewport */
 body > header,
 body > main,
 body > footer {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
+    max-width: 100vw;
     box-sizing: border-box;
-    flex-shrink: 0;
 }
 
-/* 3. Header: contenido siempre adentro, sin estirarse */
+/* El header no permite que su contenido lo empuje */
 header.header-gradient {
-    position: relative;
-    overflow: hidden;
-    z-index: 10;
-}
-
-header.header-gradient > .container-md {
-    max-width: 100% !important;
-    min-width: 0;
-    flex-wrap: nowrap;
-}
-
-header .text-white {
-    min-width: 0;
-    overflow: hidden;
-    flex-shrink: 1;
-}
-
-header .text-white > div {
-    min-width: 0;
     overflow: hidden;
 }
 
-header h1,
-header small {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* 4. Zona derecha del header: NUNCA se encoge ni se oculta */
-header .text-end {
-    flex-shrink: 0 !important;
-    min-width: 0;
-    position: relative;
-    z-index: 2;
-}
-
-/* 5. Main + section: contención, y el scroll vive SOLO en .messages */
-main {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box;
-}
-
-main > section.messages {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-}
-
-/* 6. Imagen resultado: nunca desborda */
-.result-image-wrapper {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
+/* La imagen resultado nunca desborda su burbuja */
 .result-image {
-    width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100%;
     height: auto;
     display: block;
-}
-
-/* 7. Mobile: header se reorganiza sin romperse */
-@media (max-width: 576px) {
-    header h1,
-    header small {
-        white-space: normal;
-    }
-    header .status-badge {
-        font-size: 0.65rem;
-        padding: 3px 8px !important;
-    }
 }
