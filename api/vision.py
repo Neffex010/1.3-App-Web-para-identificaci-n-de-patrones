@@ -174,7 +174,6 @@ class handler(BaseHTTPRequestHandler):
                     }
                 ],
                 max_completion_tokens=2000,  # Nota: 'max_completion_tokens' es el parámetro correcto para GPT-5.6
-                temperature=0.0,
                 reasoning_effort="high",
                 timeout=OPENAI_TIMEOUT
             )
