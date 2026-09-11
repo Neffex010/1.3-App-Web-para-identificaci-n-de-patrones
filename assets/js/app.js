@@ -382,8 +382,7 @@ form.addEventListener("submit", async (event) => {
         }
 
         // ---- RETO 4: Render en tarjetas HTML ----
-        const resultMsg = addMessage(buildResultHtml(data), "assistant", true);
-        resultMsg.classList.add("has-result");
+        addMessage(buildResultHtml(data), "assistant", true);
         clearPreview();
 
     } catch (error) {
