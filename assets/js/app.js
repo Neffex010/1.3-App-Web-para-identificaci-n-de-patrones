@@ -1,13 +1,13 @@
 // ============================================================
-//  VisiÃ³n IA â€” LÃ³gica de cliente
+//  Visión IA — Lógica de cliente
 //  - Carga local (Base64) y por URL
-//  - EnvÃ­o a /api/vision y render de la imagen marcada
+//  - Envío a /api/vision y render de la imagen marcada
 // ============================================================
 
 const API_URL = "https://1-3-app-web-para-identificaci-n-de-sigma.vercel.app/api/vision";
 
-// Si algÃºn dÃ­a activas APP_KEY en Vercel, pon aquÃ­ el mismo valor.
-// Mientras sea null, no se envÃ­a la cabecera X-App-Key.
+// Si algún día activas APP_KEY en Vercel, pon aquí el mismo valor.
+// Mientras sea null, no se envía la cabecera X-App-Key.
 const APP_KEY = null;
 
 // ---------- Referencias del DOM ----------
@@ -22,7 +22,7 @@ const imagePreviewContainer   = document.getElementById("imagePreviewContainer")
 const imagePreview            = document.getElementById("imagePreview");
 const removeImageBtn          = document.getElementById("removeImageBtn");
 
-// ---------- BotÃ³n de URL: se crea si no existe en el HTML ----------
+// ---------- Botón de URL: se crea si no existe en el HTML ----------
 let urlButton = document.getElementById("urlButton");
 if (!urlButton) {
     urlButton = document.createElement("button");
@@ -35,7 +35,7 @@ if (!urlButton) {
     urlButton.addEventListener("mouseover", () => { urlButton.style.backgroundColor = "#e2e8f0"; });
     urlButton.addEventListener("mouseout",  () => { urlButton.style.backgroundColor = "transparent"; });
 
-    // Se inserta justo despuÃ©s del input file, dentro del .input-group
+    // Se inserta justo después del input file, dentro del .input-group
     if (imageInput && imageInput.parentNode) {
         imageInput.parentNode.insertBefore(urlButton, imageInput.nextSibling);
     }
@@ -56,7 +56,7 @@ function addMessage(text, type, isHtml = false) {
     const label = document.createElement("div");
     label.classList.add("message-label");
     label.innerHTML = type === "user"
-        ? '<i class="bi bi-person-fill"></i> TÃº'
+        ? '<i class="bi bi-person-fill"></i> Tú'
         : '<i class="bi bi-robot"></i> IA';
 
     const content = document.createElement("div");
@@ -94,12 +94,12 @@ imageInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // ValidaciÃ³n de tamaÃ±o antes de leer (evita 413)
+    // Validación de tamaño antes de leer (evita 413)
     if (file.size > 5 * 1024 * 1024) {
         addMessage(
             `<div class="text-danger fw-bold">
                 <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                La imagen pesa ${(file.size / 1024 / 1024).toFixed(2)} MB. El mÃ¡ximo permitido es 5 MB.
+                La imagen pesa ${(file.size / 1024 / 1024).toFixed(2)} MB. El máximo permitido es 5 MB.
              </div>`,
             "assistant", true
         );
@@ -118,23 +118,23 @@ imageInput.addEventListener("change", (e) => {
     reader.readAsDataURL(file);
 });
 
-// ---------- Carga por URL (botÃ³n) ----------
+// ---------- Carga por URL (botón) ----------
 urlButton.addEventListener("click", () => {
-    const url = prompt("Ingresa la URL pÃºblica de la imagen (debe iniciar con http:// o https://):");
+    const url = prompt("Ingresa la URL pública de la imagen (debe iniciar con http:// o https://):");
     if (!url) return;
 
     if (isValidHttpUrl(url)) {
         activeImagePayload = url.trim();
         showPreview(activeImagePayload);
     } else {
-        alert("Formato de URL invÃ¡lido. Debe comenzar con http:// o https://");
+        alert("Formato de URL inválido. Debe comenzar con http:// o https://");
     }
 });
 
 // ---------- Remover imagen ----------
 removeImageBtn.addEventListener("click", clearPreview);
 
-// ---------- EnvÃ­o del formulario ----------
+// ---------- Envío del formulario ----------
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = input.value.trim();
@@ -142,12 +142,12 @@ form.addEventListener("submit", async (event) => {
     // Nada que enviar
     if (!message && !activeImagePayload) return;
 
-    // Caso especial: el usuario escribiÃ³/pegÃ³ una URL como mensaje y no hay imagen adjunta
+    // Caso especial: el usuario escribió/pegó una URL como mensaje y no hay imagen adjunta
     if (!activeImagePayload && isValidHttpUrl(message)) {
         activeImagePayload = message.trim();
         showPreview(activeImagePayload);
         addMessage(
-            "URL detectada. Ahora escrÃ­beme quÃ© elementos debo contar o identificar en esa imagen.",
+            "URL detectada. Ahora escríbeme qué elementos debo contar o identificar en esa imagen.",
             "assistant"
         );
         input.value = "";
@@ -157,19 +157,19 @@ form.addEventListener("submit", async (event) => {
 
     if (!activeImagePayload) {
         addMessage(
-            'Adjunta una imagen (<i class="bi bi-image"></i>), usa el botÃ³n <i class="bi bi-link-45deg"></i> o pega una URL como mensaje.',
+            'Adjunta una imagen (<i class="bi bi-image"></i>), usa el botón <i class="bi bi-link-45deg"></i> o pega una URL como mensaje.',
             "assistant", true
         );
         return;
     }
 
     if (!message) {
-        addMessage("Escribe quÃ© elementos quieres que identifique y cuente.", "assistant");
+        addMessage("Escribe qué elementos quieres que identifique y cuente.", "assistant");
         return;
     }
 
     // Reflejar mensaje del usuario
-    addMessage(`${message}\n\n[Imagen adjunta para anÃ¡lisis]`, "user");
+    addMessage(`${message}\n\n[Imagen adjunta para análisis]`, "user");
 
     // Bloqueo de UI
     input.value = "";
@@ -182,7 +182,7 @@ form.addEventListener("submit", async (event) => {
     const loading = addMessage(
         `<div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-            <span>Analizando imagen con gpt-4o (alta resoluciÃ³n)...</span>
+            <span>Analizando imagen con gpt-4o (alta resolución)...</span>
          </div>`,
         "loading", true
     );
@@ -197,7 +197,7 @@ form.addEventListener("submit", async (event) => {
             body: JSON.stringify({ prompt: message, image: activeImagePayload })
         });
 
-        // El server podrÃ­a devolver HTML en un error de Vercel (502, etc.)
+        // El server podría devolver HTML en un error de Vercel (502, etc.)
         let data;
         try {
             data = await response.json();
@@ -210,12 +210,12 @@ form.addEventListener("submit", async (event) => {
         if (!response.ok) {
             let errorMsg = `Error ${response.status}: `;
             switch (response.status) {
-                case 400: errorMsg += "PeticiÃ³n invÃ¡lida. Verifica la imagen."; break;
-                case 403: errorMsg += "Acceso bloqueado (CORS o autenticaciÃ³n)."; break;
-                case 413: errorMsg += "La imagen es demasiado pesada (mÃ¡x 5 MB)."; break;
+                case 400: errorMsg += "Petición inválida. Verifica la imagen."; break;
+                case 403: errorMsg += "Acceso bloqueado (CORS o autenticación)."; break;
+                case 413: errorMsg += "La imagen es demasiado pesada (máx 5 MB)."; break;
                 case 429: errorMsg += "Demasiadas peticiones. Espera un momento."; break;
                 case 500: errorMsg += `Fallo interno del servidor. ${data.error || "Sin detalles."}`; break;
-                case 504: errorMsg += "El anÃ¡lisis agotÃ³ el tiempo de espera."; break;
+                case 504: errorMsg += "El análisis agotó el tiempo de espera."; break;
                 default:  errorMsg += data.error || "Error desconocido.";
             }
             throw new Error(errorMsg);
@@ -252,7 +252,7 @@ resetButton.addEventListener("click", () => {
         <div class="message assistant">
             <div class="message-label"><i class="bi bi-robot"></i> IA</div>
             <div class="message-content">
-                Sube una imagen, usa el botÃ³n <i class="bi bi-link-45deg"></i> para pegar una URL,
+                Sube una imagen, usa el botón <i class="bi bi-link-45deg"></i> para pegar una URL,
                 o pega la URL directamente como mensaje.
             </div>
         </div>
