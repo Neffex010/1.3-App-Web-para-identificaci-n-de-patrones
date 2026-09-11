@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Análisis visual con IA: identifica y cuenta objetos en imágenes usando modelos multimodales">
+    <meta name="theme-color" content="#0f172a">
     <title>Visión IA | Identificación de Patrones</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👁️</text></svg>">
     <!-- Fuentes e Íconos -->
@@ -19,18 +21,21 @@
     <!-- Encabezado -->
     <header class="navbar navbar-dark shadow-sm p-3 header-gradient">
         <div class="container-md d-flex justify-content-between align-items-center">
-            <div class="text-white d-flex align-items-center gap-2">
-                <i class="bi bi-eye-fill fs-2"></i>
+            <div class="text-white d-flex align-items-center gap-3">
+                <div class="brand-icon">
+                    <i class="bi bi-eye-fill fs-2"></i>
+                </div>
                 <div>
                     <h1 class="h5 mb-0 fw-bold">Visión IA</h1>
                     <small class="text-white-50" style="font-size: 0.8rem;">Conteo e Identificación de Patrones</small>
                 </div>
             </div>
             <div class="text-end d-flex flex-column align-items-end gap-2">
-                <span class="badge bg-success rounded-pill px-3 py-1 shadow-sm">
-                    <i class="bi bi-circle-fill text-white me-1" style="font-size: 0.5rem;"></i> gpt-4o Activo
+                <span class="badge status-badge rounded-pill px-3 py-1 shadow-sm">
+                    <i class="bi bi-circle-fill me-1 pulse-dot" style="font-size: 0.5rem;"></i>
+                    GPT-5.6 Terra Activo
                 </span>
-                <button id="resetButton" class="btn btn-outline-light btn-sm fw-bold rounded-pill border-0 hover-opacity">
+                <button id="resetButton" class="btn btn-outline-light btn-sm fw-bold rounded-pill border-0 hover-opacity" aria-label="Reiniciar conversación">
                     <i class="bi bi-arrow-counterclockwise"></i> Reiniciar
                 </button>
             </div>
@@ -52,40 +57,38 @@
         </section>
 
         <!-- Zona del Formulario -->
-        <div class="p-3 bg-white border-top">
+        <div class="p-3 bg-white border-top form-zone">
 
             <!-- Previsualización de imagen -->
-            <div id="imagePreviewContainer" class="d-none mb-2 px-2 position-relative d-inline-block">
-                <img id="imagePreview" src="" class="img-thumbnail shadow-sm"
-                     style="max-height: 120px; border-radius: 8px;" alt="Previsualización">
+            <div id="imagePreviewContainer" class="d-none mb-3 position-relative d-inline-block preview-wrap">
+                <img id="imagePreview" src="" class="img-thumbnail shadow-sm preview-img"
+                     alt="Previsualización">
                 <button type="button" id="removeImageBtn"
-                        class="btn btn-sm btn-danger position-absolute top-0 start-100 translate-middle rounded-circle shadow"
-                        title="Quitar imagen">
+                        class="btn btn-sm btn-danger position-absolute top-0 start-100 translate-middle rounded-circle shadow remove-img-btn"
+                        title="Quitar imagen"
+                        aria-label="Quitar imagen">
                     <i class="bi bi-x"></i>
                 </button>
+                <span class="preview-badge">Imagen lista</span>
             </div>
 
             <form id="chatForm" class="d-flex flex-column">
-                <div class="input-group input-group-lg shadow-sm rounded-pill overflow-hidden border bg-light align-items-center pe-2">
+                <div class="input-group input-group-lg shadow-sm rounded-pill overflow-hidden border bg-light align-items-center pe-2 input-wrapper">
 
                     <!-- Botón para subir imagen local -->
                     <label for="imageInput"
-                           class="btn btn-light text-secondary border-0 px-4 py-2 fs-5 m-1 rounded-pill"
-                           style="cursor: pointer; transition: 0.2s;"
-                           onmouseover="this.style.backgroundColor='#e2e8f0'"
-                           onmouseout="this.style.backgroundColor='transparent'"
-                           title="Subir imagen desde tu dispositivo">
+                           class="btn btn-light text-secondary border-0 px-4 py-2 fs-5 m-1 rounded-pill action-btn"
+                           title="Subir imagen desde tu dispositivo"
+                           aria-label="Subir imagen desde tu dispositivo">
                         <i class="bi bi-image"></i>
                     </label>
                     <input type="file" id="imageInput" accept="image/*" class="d-none">
 
                     <!-- Botón para insertar URL de imagen -->
                     <button type="button" id="urlButton"
-                            class="btn btn-light text-secondary border-0 px-4 py-2 fs-5 m-1 rounded-pill"
-                            style="transition: 0.2s;"
-                            onmouseover="this.style.backgroundColor='#e2e8f0'"
-                            onmouseout="this.style.backgroundColor='transparent'"
-                            title="Insertar URL de imagen">
+                            class="btn btn-light text-secondary border-0 px-4 py-2 fs-5 m-1 rounded-pill action-btn"
+                            title="Insertar URL de imagen"
+                            aria-label="Insertar URL de imagen">
                         <i class="bi bi-link-45deg"></i>
                     </button>
 
@@ -96,13 +99,15 @@
                         class="form-control border-0 px-2 bg-light focus-ring"
                         placeholder="Ej. 'Cuenta los automóviles'..."
                         autocomplete="off"
+                        aria-label="Instrucción para la IA"
                         required
                     >
 
                     <!-- Botón de enviar -->
                     <button id="sendButton" type="submit"
-                            class="btn btn-primary px-4 fw-bold rounded-pill my-1 me-1 shadow-sm"
-                            title="Enviar al análisis">
+                            class="btn btn-primary px-4 fw-bold rounded-pill my-1 me-1 shadow-sm send-btn"
+                            title="Enviar al análisis"
+                            aria-label="Enviar al análisis">
                         <i class="bi bi-send-fill"></i>
                     </button>
                 </div>
