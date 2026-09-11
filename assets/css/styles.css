@@ -735,3 +735,94 @@
         font-size: 1.05rem;
     }
 }
+/* =========================================================
+   FIX — overflow del layout cuando la respuesta trae imagen
+   ========================================================= */
+
+/* Permitir que flexbox encoja los hijos por debajo de su contenido */
+.message,
+.message-content {
+    min-width: 0;
+}
+
+/* Cuando la burbuja del asistente contiene resultado (imagen + tarjetas),
+   le damos más ancho para que respire */
+.message.assistant.has-result {
+    max-width: 95%;
+    width: 95%;
+}
+
+/* El grid de categorías debe poder encojerse sin forzar ancho */
+.category-grid {
+    grid-template-columns: repeat(auto-fill, minmax(0, 1fr));
+    min-width: 0;
+}
+
+/* Cada tarjeta tampoco debe forzar ancho */
+.category-card {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.category-name {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+}
+
+/* El wrapper de la imagen nunca debe desbordar */
+.result-image-wrapper {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.result-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* El bloque de razonamiento también */
+.razonamiento-block {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+.razonamiento-block p {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Encabezado de resultado — evitar que se estire */
+.result-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 100%;
+}
+.result-total {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+/* Prevenir scroll horizontal en el contenedor de mensajes */
+.messages {
+    overflow-x: hidden;
+}
+
+/* En móviles, reducir un poco el ancho de las burbujas con resultado */
+@media (max-width: 768px) {
+    .message.assistant.has-result {
+        max-width: 100%;
+        width: 100%;
+    }
+    .category-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    .category-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .category-count {
+        font-size: 1.4rem;
+    }
+}
