@@ -87,6 +87,7 @@ removeImageBtn.addEventListener("click", () => {
 });
 
 // Manejo del envío del formulario
+// Manejo del envío del formulario (Reemplaza desde form.addEventListener("submit", async (event) => { ... })
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = input.value.trim();
@@ -94,19 +95,27 @@ form.addEventListener("submit", async (event) => {
     if (!message) return;
 
     if (!activeImagePayload) {
-        addMessage("Por favor, adjunta una imagen o ingresa una URL antes de enviar el comando.", "assistant");
+        addMessage("Por favor, adjunta una imagen o ingresa una URL antes de enviar la instrucción.", "assistant");
         return;
     }
 
     addMessage(`${message}\n\n[Imagen adjunta para análisis]`, "user");
 
+    // Bloqueo de UI
     input.value = "";
     input.disabled = true;
     sendButton.disabled = true;
     imageInput.disabled = true;
     if (urlButton) urlButton.disabled = true;
 
-    const loading = addMessage("Analizando coordenadas y renderizando imagen...", "loading");
+    // DINAMISMO: Spinner de Bootstrap incrustado en el mensaje
+    const loadingHtml = `
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span>Analizando con precisión (gpt-4o alta resolución)...</span>
+        </div>
+    `;
+    const loading = addMessage(loadingHtml, "loading", true);
 
     try {
         const response = await fetch(API_URL, {
@@ -118,21 +127,36 @@ form.addEventListener("submit", async (event) => {
         const data = await response.json();
         loading.remove();
 
+        // MANEJO DE ERRORES ESTRUCTURADO
         if (!response.ok) {
-            throw new Error(data.error || `Error del servidor: Código ${response.status}`);
+            let errorMsg = "Error del servidor al procesar la imagen.";
+            if (response.status === 400) errorMsg = "Error 400: Petición inválida. Verifica tu imagen.";
+            if (response.status === 403) errorMsg = "Error 403: Acceso bloqueado por CORS o permisos.";
+            if (response.status === 413) errorMsg = "Error 413: La imagen es demasiado pesada para el servidor (Payload Too Large).";
+            if (response.status === 500) errorMsg = `Error 500: Fallo interno de IA. Detalles: ${data.error || "Desconocido"}`;
+            if (response.status === 504) errorMsg = "Error 504: El análisis en alta resolución agotó el tiempo de espera del servidor.";
+            throw new Error(errorMsg);
         }
 
         const htmlResponse = `
-            <strong>Elementos identificados: ${data.count}</strong><br><br>
+            <strong>Total de elementos mapeados: ${data.count}</strong><br><br>
             <img src="${data.image}" class="img-fluid rounded mt-2 border shadow-sm" style="max-width: 100%;">
         `;
         
         addMessage(htmlResponse, "assistant", true);
         removeImageBtn.click();
+        
     } catch (error) {
         loading.remove();
-        addMessage(`Error: ${error.message}`, "assistant");
+        // Feedback visual del error
+        const errorHtml = `
+            <div class="text-danger fw-bold">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i> ${error.message}
+            </div>
+        `;
+        addMessage(errorHtml, "assistant", true);
     } finally {
+        // Desbloqueo de UI
         input.disabled = false;
         sendButton.disabled = false;
         imageInput.disabled = false;
@@ -140,7 +164,6 @@ form.addEventListener("submit", async (event) => {
         input.focus();
     }
 });
-
 // Reinicio de la interfaz
 resetButton.addEventListener("click", () => {
     messages.innerHTML = `
