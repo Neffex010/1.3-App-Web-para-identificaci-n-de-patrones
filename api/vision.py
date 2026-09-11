@@ -9,18 +9,17 @@ from PIL import Image, ImageDraw
 
 # ---------- Configuración por entorno ----------
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "").rstrip("/")
-APP_KEY = os.environ.get("APP_KEY")  # Opcional: si existe, se exige cabecera X-App-Key
+APP_KEY = os.environ.get("APP_KEY")  # Opcional
 
 # ---------- Límites ----------
-MAX_IMAGE_BYTES = 5_000_000     # 5 MB
-MAX_DIMENSION   = 2048          # lado máximo tras redimensión
-OPENAI_TIMEOUT  = 25.0          # segundos
+MAX_IMAGE_BYTES = 5_000_000
+MAX_DIMENSION   = 2048
+OPENAI_TIMEOUT  = 25.0
 MODEL_NAME      = "gpt-5.6-terra"
 
 
 class handler(BaseHTTPRequestHandler):
 
-    # -------- CORS --------
     def add_cors_headers(self):
         origin = self.headers.get("Origin", "")
         if ALLOWED_ORIGIN and origin == ALLOWED_ORIGIN:
@@ -29,7 +28,6 @@ class handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Vary", "Origin")
 
-    # -------- Respuesta JSON --------
     def send_json(self, status_code, data):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status_code)
@@ -39,7 +37,6 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    # -------- Preflight --------
     def do_OPTIONS(self):
         self.send_response(204)
         self.add_cors_headers()
@@ -47,16 +44,13 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-App-Key")
         self.end_headers()
 
-    # -------- POST principal --------
     def do_POST(self):
-        response_text = ""  # Inicializado para evitar NameError en except
+        response_text = ""
         try:
-            # --- 0. Autenticación opcional ---
             if APP_KEY and self.headers.get("X-App-Key") != APP_KEY:
                 self.send_json(403, {"error": "No autorizado. Falta X-App-Key válida."})
                 return
 
-            # --- 1. Parsear payload ---
             content_length = int(self.headers.get("Content-Length", 0))
             if content_length <= 0:
                 self.send_json(400, {"error": "Payload vacío."})
@@ -72,7 +66,6 @@ class handler(BaseHTTPRequestHandler):
                 self.send_json(400, {"error": "Petición malformada. Se requiere imagen y texto."})
                 return
 
-            # --- 2. Obtener bytes de la imagen (URL o Base64) ---
             is_url = isinstance(image_payload, str) and (
                 image_payload.startswith("http://") or image_payload.startswith("https://")
             )
@@ -91,7 +84,6 @@ class handler(BaseHTTPRequestHandler):
                     b64_data = image_payload
                 image_bytes = base64.b64decode(b64_data)
 
-            # --- 3. Validar tamaño en bytes ---
             if len(image_bytes) > MAX_IMAGE_BYTES:
                 self.send_json(413, {
                     "error": f"Imagen demasiado grande ({len(image_bytes) // 1024} KB). "
@@ -99,7 +91,6 @@ class handler(BaseHTTPRequestHandler):
                 })
                 return
 
-            # --- 4. Normalizar y redimensionar ---
             try:
                 img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             except Exception:
@@ -115,22 +106,24 @@ class handler(BaseHTTPRequestHandler):
             b64_data = base64.b64encode(image_bytes).decode("utf-8")
             openai_image_url = f"data:image/jpeg;base64,{b64_data}"
 
-            # --- 5. Llamada a OpenAI con esquema estricto ---
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+            # ---- RETO 2 y 4: prompt + schema con categorías ----
             sys_prompt = (
                 "Eres un experto en visión computacional especializado en detección exhaustiva. "
-                "Tu tarea es localizar TODOS los objetos del tipo solicitado, sin omitir ninguno. "
+                "Tu tarea es localizar TODOS los objetos del tipo solicitado, sin omitir ninguno.\n"
                 "Procedimiento obligatorio:\n"
-                "1) Escanea la imagen mentalmente en 4 cuadrantes (superior-izquierdo, superior-derecho, "
-                "inferior-izquierdo, inferior-derecho). Revisa cada uno de forma independiente.\n"
-                "2) Presta especial atención a: objetos al fondo, objetos parcialmente ocluidos por otros, "
-                "objetos cortados por el borde, objetos de color similar al fondo.\n"
-                "3) Los objetos agrupados o superpuestos CUENTAN individualmente.\n"
-                "4) En el campo 'razonamiento' describe brevemente qué viste en cada cuadrante y el total.\n"
-                "5) En el campo 'puntos' devuelve las coordenadas 'x' e 'y' normalizadas (0.000 a 1.000) "
-                "del centro de CADA objeto detectado. (0,0) es la esquina superior izquierda. "
-                "El número de puntos DEBE coincidir con el conteo que reportaste en 'razonamiento'."
+                "1) Escanea mentalmente la imagen en 4 cuadrantes.\n"
+                "2) Presta atención a objetos al fondo, ocluidos, cortados por el borde o camuflados.\n"
+                "3) Los objetos agrupados CUENTAN individualmente.\n"
+                "4) En 'razonamiento' describe brevemente qué viste en cada cuadrante.\n"
+                "5) En 'categorias' agrupa los objetos detectados por tipo. Para cada categoría indica:\n"
+                "   - nombre (string, ej. 'vacas', 'árboles', 'autos')\n"
+                "   - cantidad (int)\n"
+                "   - certeza ('alta', 'media' o 'baja')\n"
+                "6) En 'puntos' devuelve las coordenadas x,y normalizadas (0.000 a 1.000) del centro "
+                "de CADA objeto detectado. (0,0) es la esquina superior izquierda.\n"
+                "El total de puntos DEBE coincidir con la suma de cantidades en 'categorias'."
             )
 
             response = client.chat.completions.create(
@@ -144,6 +137,19 @@ class handler(BaseHTTPRequestHandler):
                             "type": "object",
                             "properties": {
                                 "razonamiento": {"type": "string"},
+                                "categorias": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "nombre":   {"type": "string"},
+                                            "cantidad": {"type": "integer"},
+                                            "certeza":  {"type": "string", "enum": ["alta", "media", "baja"]}
+                                        },
+                                        "required": ["nombre", "cantidad", "certeza"],
+                                        "additionalProperties": False
+                                    }
+                                },
                                 "puntos": {
                                     "type": "array",
                                     "items": {
@@ -157,7 +163,7 @@ class handler(BaseHTTPRequestHandler):
                                     }
                                 }
                             },
-                            "required": ["razonamiento", "puntos"],
+                            "required": ["razonamiento", "categorias", "puntos"],
                             "additionalProperties": False
                         }
                     }
@@ -173,7 +179,7 @@ class handler(BaseHTTPRequestHandler):
                         ]
                     }
                 ],
-                max_completion_tokens=2000,  # Nota: 'max_completion_tokens' es el parámetro correcto para GPT-5.6
+                max_completion_tokens=2000,
                 reasoning_effort="high",
                 timeout=OPENAI_TIMEOUT
             )
@@ -183,11 +189,12 @@ class handler(BaseHTTPRequestHandler):
                 self.send_json(500, {"error": "El modelo no devolvió contenido."})
                 return
 
-            parsed_json = json.loads(response_text)
-            coords = parsed_json.get("puntos", [])
+            parsed_json  = json.loads(response_text)
+            coords       = parsed_json.get("puntos", [])
             razonamiento = parsed_json.get("razonamiento", "")
+            categorias   = parsed_json.get("categorias", [])
 
-            # --- 6. Dibujar marcadores ---
+            # ---- Dibujar marcadores ----
             width, height = img.size
             draw = ImageDraw.Draw(img)
             radius = max(width, height) * 0.015
@@ -215,9 +222,10 @@ class handler(BaseHTTPRequestHandler):
             out_b64 = base64.b64encode(out_buffer.getvalue()).decode("utf-8")
 
             self.send_json(200, {
-                "count": len(coords),
-                "image": f"data:image/jpeg;base64,{out_b64}",
-                "razonamiento": razonamiento
+                "count":        len(coords),
+                "image":        f"data:image/jpeg;base64,{out_b64}",
+                "razonamiento": razonamiento,
+                "categorias":   categorias
             })
 
         except json.JSONDecodeError as e:

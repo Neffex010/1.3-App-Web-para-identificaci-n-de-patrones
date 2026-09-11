@@ -1,13 +1,11 @@
 // ============================================================
 //  Visión IA — Lógica de cliente
 //  - Carga local (Base64) y por URL
-//  - Envío a /api/vision y render de la imagen marcada
+//  - Drag & drop (Reto 3)
+//  - Render de categorías en tarjetas (Reto 4)
 // ============================================================
 
 const API_URL = "https://1-3-app-web-para-identificaci-n-de-sigma.vercel.app/api/vision";
-
-// Si algún día activas APP_KEY en Vercel, pon aquí el mismo valor.
-// Mientras sea null, no se envía la cabecera X-App-Key.
 const APP_KEY = null;
 
 // ---------- Referencias del DOM ----------
@@ -22,31 +20,35 @@ const imagePreviewContainer   = document.getElementById("imagePreviewContainer")
 const imagePreview            = document.getElementById("imagePreview");
 const removeImageBtn          = document.getElementById("removeImageBtn");
 
-// ---------- Botón de URL: se crea si no existe en el HTML ----------
+// ---------- Botón de URL: se crea si no existe ----------
 let urlButton = document.getElementById("urlButton");
 if (!urlButton) {
     urlButton = document.createElement("button");
     urlButton.type = "button";
     urlButton.id = "urlButton";
     urlButton.title = "Insertar URL de imagen";
-    urlButton.className = "btn btn-light text-secondary border-0 px-4 py-2 fs-5 m-1 rounded-pill";
-    urlButton.style.transition = "0.2s";
+    urlButton.className = "btn btn-light text-secondary border-0 px-4 py-2 fs-5 m-1 rounded-pill action-btn";
     urlButton.innerHTML = '<i class="bi bi-link-45deg"></i>';
-    urlButton.addEventListener("mouseover", () => { urlButton.style.backgroundColor = "#e2e8f0"; });
-    urlButton.addEventListener("mouseout",  () => { urlButton.style.backgroundColor = "transparent"; });
-
-    // Se inserta justo después del input file, dentro del .input-group
     if (imageInput && imageInput.parentNode) {
         imageInput.parentNode.insertBefore(urlButton, imageInput.nextSibling);
     }
 }
 
 // ---------- Estado ----------
-let activeImagePayload = null;  // Puede ser un data URI (Base64) o una URL http/https
+let activeImagePayload = null;
 
 // ---------- Helpers ----------
 function isValidHttpUrl(str) {
     return typeof str === "string" && /^https?:\/\/\S+/i.test(str.trim());
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 function addMessage(text, type, isHtml = false) {
@@ -89,12 +91,78 @@ function clearPreview() {
     imagePreviewContainer.classList.add("d-none");
 }
 
+// ---------- Reto 4: construir tarjetas HTML ----------
+function buildResultHtml(data) {
+    const categorias = Array.isArray(data.categorias) ? data.categorias : [];
+    const razonamiento = data.razonamiento || "";
+
+    // Colores por nivel de certeza
+    const certezaClass = {
+        alta:  "certeza-alta",
+        media: "certeza-media",
+        baja:  "certeza-baja"
+    };
+
+    // Encabezado con total
+    let html = `
+        <div class="result-header">
+            <div class="result-total">
+                <i class="bi bi-check2-circle"></i>
+                <strong>${data.count}</strong> elemento${data.count === 1 ? "" : "s"} identificado${data.count === 1 ? "" : "s"}
+            </div>
+        </div>
+    `;
+
+    // Tarjetas por categoría
+    if (categorias.length > 0) {
+        html += `<div class="category-grid">`;
+        categorias.forEach(cat => {
+            const nombre = escapeHtml(cat.nombre || "sin nombre");
+            const cantidad = Number(cat.cantidad) || 0;
+            const certeza = (cat.certeza || "media").toLowerCase();
+            const cClass = certezaClass[certeza] || "certeza-media";
+
+            html += `
+                <div class="category-card">
+                    <div class="category-name">${nombre}</div>
+                    <div class="category-count">${cantidad}</div>
+                    <span class="certeza-badge ${cClass}">Certeza ${certeza}</span>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    // Razonamiento (si existe)
+    if (razonamiento) {
+        html += `
+            <details class="razonamiento-block">
+                <summary><i class="bi bi-lightbulb"></i> Ver razonamiento del modelo</summary>
+                <p>${escapeHtml(razonamiento)}</p>
+            </details>
+        `;
+    }
+
+    // Imagen procesada
+    if (data.image) {
+        html += `
+            <div class="result-image-wrapper">
+                <img src="${data.image}" alt="Imagen con detecciones marcadas" class="result-image">
+                <a href="${data.image}" download="analisis-vision-ia.jpg" class="download-btn" title="Descargar imagen">
+                    <i class="bi bi-download"></i> Descargar
+                </a>
+            </div>
+        `;
+    }
+
+    return html;
+}
+
 // ---------- Carga de archivo local ----------
 imageInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validación de tamaño antes de leer (evita 413)
     if (file.size > 5 * 1024 * 1024) {
         addMessage(
             `<div class="text-danger fw-bold">
@@ -109,7 +177,7 @@ imageInput.addEventListener("change", (e) => {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-        activeImagePayload = event.target.result;  // data:image/...;base64,...
+        activeImagePayload = event.target.result;
         showPreview(activeImagePayload);
     };
     reader.onerror = () => {
@@ -134,15 +202,111 @@ urlButton.addEventListener("click", () => {
 // ---------- Remover imagen ----------
 removeImageBtn.addEventListener("click", clearPreview);
 
+// ============================================================
+//  RETO 3: Drag & Drop
+// ============================================================
+let dragCounter = 0;  // Para manejar dragenter/dragleave anidados
+
+// Overlay visual (se crea una sola vez)
+const dropOverlay = document.createElement("div");
+dropOverlay.id = "dropOverlay";
+dropOverlay.className = "drop-overlay";
+dropOverlay.innerHTML = `
+    <div class="drop-overlay-inner">
+        <i class="bi bi-cloud-arrow-down-fill"></i>
+        <p>Suelta la imagen aquí</p>
+        <small>Formatos: JPG, PNG, WebP · Máx 5 MB</small>
+    </div>
+`;
+document.body.appendChild(dropOverlay);
+
+function isFileDrag(e) {
+    if (!e.dataTransfer) return false;
+    const types = e.dataTransfer.types;
+    return types && Array.from(types).includes("Files");
+}
+
+document.addEventListener("dragenter", (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter++;
+    if (dragCounter === 1) {
+        dropOverlay.classList.add("active");
+    }
+});
+
+document.addEventListener("dragover", (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+});
+
+document.addEventListener("dragleave", (e) => {
+    if (!isFileDrag(e)) return;
+    dragCounter--;
+    if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropOverlay.classList.remove("active");
+    }
+});
+
+document.addEventListener("drop", (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter = 0;
+    dropOverlay.classList.remove("active");
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+
+    // Validar tipo
+    if (!file.type.startsWith("image/")) {
+        addMessage(
+            `<div class="text-danger fw-bold">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                El archivo soltado no es una imagen. Solo se aceptan JPG, PNG o WebP.
+             </div>`,
+            "assistant", true
+        );
+        return;
+    }
+
+    // Validar tamaño
+    if (file.size > 5 * 1024 * 1024) {
+        addMessage(
+            `<div class="text-danger fw-bold">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                La imagen pesa ${(file.size / 1024 / 1024).toFixed(2)} MB. El máximo permitido es 5 MB.
+             </div>`,
+            "assistant", true
+        );
+        return;
+    }
+
+    // Leer como Base64
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        activeImagePayload = event.target.result;
+        showPreview(activeImagePayload);
+        // Scroll al final para que el usuario vea el preview
+        messages.scrollTop = messages.scrollHeight;
+    };
+    reader.onerror = () => {
+        addMessage("No se pudo leer el archivo soltado.", "assistant");
+    };
+    reader.readAsDataURL(file);
+});
+
 // ---------- Envío del formulario ----------
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = input.value.trim();
 
-    // Nada que enviar
     if (!message && !activeImagePayload) return;
 
-    // Caso especial: el usuario escribió/pegó una URL como mensaje y no hay imagen adjunta
+    // URL pegada como mensaje
     if (!activeImagePayload && isValidHttpUrl(message)) {
         activeImagePayload = message.trim();
         showPreview(activeImagePayload);
@@ -157,7 +321,7 @@ form.addEventListener("submit", async (event) => {
 
     if (!activeImagePayload) {
         addMessage(
-            'Adjunta una imagen (<i class="bi bi-image"></i>), usa el botón <i class="bi bi-link-45deg"></i> o pega una URL como mensaje.',
+            'Adjunta una imagen (<i class="bi bi-image"></i>), arrástrala a la ventana, usa el botón <i class="bi bi-link-45deg"></i> o pega una URL.',
             "assistant", true
         );
         return;
@@ -168,21 +332,18 @@ form.addEventListener("submit", async (event) => {
         return;
     }
 
-    // Reflejar mensaje del usuario
     addMessage(`${message}\n\n[Imagen adjunta para análisis]`, "user");
 
-    // Bloqueo de UI
     input.value = "";
     input.disabled = true;
     sendButton.disabled = true;
     imageInput.disabled = true;
     urlButton.disabled = true;
 
-    // Spinner
     const loading = addMessage(
         `<div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-            <span>Analizando imagen con gpt-4o (alta resolución)...</span>
+            <span>Analizando imagen con GPT-5.6 (alta resolución)...</span>
          </div>`,
         "loading", true
     );
@@ -197,7 +358,6 @@ form.addEventListener("submit", async (event) => {
             body: JSON.stringify({ prompt: message, image: activeImagePayload })
         });
 
-        // El server podría devolver HTML en un error de Vercel (502, etc.)
         let data;
         try {
             data = await response.json();
@@ -221,19 +381,15 @@ form.addEventListener("submit", async (event) => {
             throw new Error(errorMsg);
         }
 
-        const htmlResponse = `
-            <strong>Elementos identificados: ${data.count}</strong><br><br>
-            <img src="${data.image}" class="img-fluid rounded mt-2 border shadow-sm" style="max-width: 100%;">
-        `;
-
-        addMessage(htmlResponse, "assistant", true);
+        // ---- RETO 4: Render en tarjetas HTML ----
+        addMessage(buildResultHtml(data), "assistant", true);
         clearPreview();
 
     } catch (error) {
         loading.remove();
         addMessage(
             `<div class="text-danger fw-bold">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i> ${error.message}
+                <i class="bi bi-exclamation-triangle-fill me-1"></i> ${escapeHtml(error.message)}
              </div>`,
             "assistant", true
         );
@@ -246,14 +402,14 @@ form.addEventListener("submit", async (event) => {
     }
 });
 
-// ---------- Reinicio de la interfaz ----------
+// ---------- Reinicio ----------
 resetButton.addEventListener("click", () => {
     messages.innerHTML = `
         <div class="message assistant">
             <div class="message-label"><i class="bi bi-robot"></i> IA</div>
             <div class="message-content">
-                Sube una imagen, usa el botón <i class="bi bi-link-45deg"></i> para pegar una URL,
-                o pega la URL directamente como mensaje.
+                Sube una imagen, arrástrala a la ventana, usa el botón <i class="bi bi-link-45deg"></i>
+                para pegar una URL, o pega la URL directamente como mensaje.
             </div>
         </div>
     `;
