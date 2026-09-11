@@ -15,6 +15,7 @@ APP_KEY = os.environ.get("APP_KEY")  # Opcional: si existe, se exige cabecera X-
 MAX_IMAGE_BYTES = 5_000_000     # 5 MB
 MAX_DIMENSION   = 2048          # lado máximo tras redimensión
 OPENAI_TIMEOUT  = 25.0          # segundos
+MODEL_NAME      = "gpt-5.6-terra"
 
 
 class handler(BaseHTTPRequestHandler):
@@ -118,17 +119,22 @@ class handler(BaseHTTPRequestHandler):
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
             sys_prompt = (
-                "Eres un experto en detección visual de objetos. "
-                "Localiza TODOS los elementos que el usuario indique, incluyendo aquellos agrupados, "
-                "de espaldas o parcialmente ocluidos. "
-                "Devuelve las coordenadas 'x' e 'y' normalizadas entre 0.000 y 1.000, "
-                "donde (0,0) es la esquina superior izquierda y (1,1) la inferior derecha. "
-                "Cada punto representa el centro del objeto detectado. "
-                "Si el usuario pide 'contar', igualmente debes devolver la lista completa de coordenadas."
+                "Eres un experto en visión computacional especializado en detección exhaustiva. "
+                "Tu tarea es localizar TODOS los objetos del tipo solicitado, sin omitir ninguno. "
+                "Procedimiento obligatorio:\n"
+                "1) Escanea la imagen mentalmente en 4 cuadrantes (superior-izquierdo, superior-derecho, "
+                "inferior-izquierdo, inferior-derecho). Revisa cada uno de forma independiente.\n"
+                "2) Presta especial atención a: objetos al fondo, objetos parcialmente ocluidos por otros, "
+                "objetos cortados por el borde, objetos de color similar al fondo.\n"
+                "3) Los objetos agrupados o superpuestos CUENTAN individualmente.\n"
+                "4) En el campo 'razonamiento' describe brevemente qué viste en cada cuadrante y el total.\n"
+                "5) En el campo 'puntos' devuelve las coordenadas 'x' e 'y' normalizadas (0.000 a 1.000) "
+                "del centro de CADA objeto detectado. (0,0) es la esquina superior izquierda. "
+                "El número de puntos DEBE coincidir con el conteo que reportaste en 'razonamiento'."
             )
 
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model=MODEL_NAME,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {
@@ -137,6 +143,7 @@ class handler(BaseHTTPRequestHandler):
                         "schema": {
                             "type": "object",
                             "properties": {
+                                "razonamiento": {"type": "string"},
                                 "puntos": {
                                     "type": "array",
                                     "items": {
@@ -150,7 +157,7 @@ class handler(BaseHTTPRequestHandler):
                                     }
                                 }
                             },
-                            "required": ["puntos"],
+                            "required": ["razonamiento", "puntos"],
                             "additionalProperties": False
                         }
                     }
@@ -160,14 +167,15 @@ class handler(BaseHTTPRequestHandler):
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": f"Busca y mapea: {prompt_text}"},
+                            {"type": "text", "text": f"Localiza y mapea exhaustivamente: {prompt_text}"},
                             {"type": "image_url",
                              "image_url": {"url": openai_image_url, "detail": "high"}}
                         ]
                     }
                 ],
-                max_tokens=2000,
+                max_completion_tokens=2000,  # Nota: 'max_completion_tokens' es el parámetro correcto para GPT-5.6
                 temperature=0.0,
+                reasoning_effort="high",
                 timeout=OPENAI_TIMEOUT
             )
 
@@ -178,6 +186,7 @@ class handler(BaseHTTPRequestHandler):
 
             parsed_json = json.loads(response_text)
             coords = parsed_json.get("puntos", [])
+            razonamiento = parsed_json.get("razonamiento", "")
 
             # --- 6. Dibujar marcadores ---
             width, height = img.size
@@ -208,7 +217,8 @@ class handler(BaseHTTPRequestHandler):
 
             self.send_json(200, {
                 "count": len(coords),
-                "image": f"data:image/jpeg;base64,{out_b64}"
+                "image": f"data:image/jpeg;base64,{out_b64}",
+                "razonamiento": razonamiento
             })
 
         except json.JSONDecodeError as e:
